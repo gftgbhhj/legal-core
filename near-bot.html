@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b7a4b"><title>Trading Bot</title>
+<style>
+:root{--bg:#fff;--fg:#14181f;--cd:#eef1f5;--ac:#0b7a4b;--rd:#c0392b;--mu:#667085;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--bg:#12151a;--fg:#e8ebf0;--cd:#1c2128;--ac:#2ecc8f;--rd:#ff6b5b;--mu:#98a2b3}}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;max-width:560px;margin-inline:auto}
+h1{font-size:19px;margin:4px 0 10px}
+.c{background:var(--cd);border-radius:12px;padding:12px;margin-bottom:10px}
+input{width:100%;padding:10px;margin:4px 0 8px;border:1px solid var(--mu);border-radius:8px;background:var(--bg);color:var(--fg);font-size:15px;direction:ltr}
+button{padding:11px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font-size:15px;font-weight:600;margin:3px 0}
+button:disabled{opacity:.45}
+button.s{background:var(--mu)}button.d{background:var(--rd)}
+.r{display:flex;gap:8px;flex-wrap:wrap}.r>*{flex:1}
+.big{font-size:28px;font-weight:700;direction:ltr;text-align:right}
+.mu{color:var(--mu);font-size:13px}.g{color:var(--ac)}.b{color:var(--rd)}
+#lg{max-height:170px;overflow:auto;font-size:12.5px;direction:rtl}
+#lg div{padding:2px 0;border-bottom:1px solid #8884}
+table{width:100%;font-size:12.5px;border-collapse:collapse}
+td,th{padding:4px;text-align:center;direction:ltr;border-bottom:1px solid #8883}
+th{color:var(--mu);font-weight:600}
+#md{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:20px;z-index:9}
+#md.on{display:flex}
+#mt{white-space:pre-line}
+#md .bx{background:var(--bg);color:var(--fg);border-radius:12px;padding:16px;max-width:420px;width:100%}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.g2 label{font-size:12px;color:var(--mu)}
+</style></head><body>
+<h1>🤖 بوت <span id="symtitle">NEAR/USDT</span> <span class="mu" id="mode"></span></h1>
+
+<div class="c" id="kc">
+<label class="mu">API Key</label><input id="k" autocomplete="off" spellcheck="false">
+<label class="mu">Secret Key</label><input id="s" type="password" autocomplete="off">
+<div class="r"><button id="cn">اتصال</button><button class="s" id="dm">تجربة (محاكاة بدون مفاتيح)</button></div>
+<div class="r"><button class="s" id="ck" style="font-size:13px">مسح المفاتيح المحفوظة</button></div>
+<div class="mu">المفاتيح تُحفظ على هذا الهاتف فقط. فعّل صلاحية Spot Trading فقط وعطّل السحب (Withdrawals)، ويُفضّل تقييد المفتاح بعنوان IP.</div>
+</div>
+
+<div class="c">
+<div class="mu">السعر الحالي — <span id="zn">-</span></div><div class="big" id="px">-</div>
+<div class="mu">رصيد USDT: <b id="ub">-</b> &nbsp; الحالة: <b id="st">متوقف</b></div>
+<div class="mu" id="nx"></div>
+<div class="r" style="margin-top:6px"><button id="go" disabled>▶ تشغيل البوت</button><button class="d" id="no" disabled>■ إيقاف</button></div>
+<div class="r"><button class="d" id="sn" disabled>بيع الصفقة الآن</button><button class="s" id="dc" disabled>قطع الاتصال</button></div>
+</div>
+
+<div class="c"><b>الصفقة الحالية</b><div id="ps" class="mu">لا توجد صفقة مفتوحة</div></div>
+
+<div class="c"><b>الإعدادات</b>
+<div class="g2">
+<div><label>رمز العملة (مثل NEAR أو BTC)</label><input id="c_sym" type="text" style="text-transform:uppercase"></div>
+<div><label>تهدئة بعد البيع (ث) — 0=فوري</label><input id="c_cool" type="number" min="0"></div>
+<div><label>حد القاع</label><input id="c_low" type="number" step="any" min="0"></div>
+<div><label>بداية الصاروخ</label><input id="c_high" type="number" step="any" min="0"></div>
+<div><label>انعكاس عادي %</label><input id="c_tr1" type="number" step="0.1" min="0"></div>
+<div><label>انعكاس الصاروخ %</label><input id="c_tr2" type="number" step="0.1" min="0"></div>
+<div><label>وقف خسارة % — 0=معطل</label><input id="c_sl" type="number" step="0.1" min="0"></div>
+</div>
+<div class="mu">تغيير العملة غير متاح أثناء وجود صفقة مفتوحة. تأكد من تعديل حدود الأسعار لتناسب العملة الجديدة.</div>
+</div>
+
+<div class="c"><b>الأداء</b><div id="pf" class="mu">-</div>
+<table id="ht"></table></div>
+<div class="c"><b>السجل</b><div id="lg"></div></div>
+<div class="mu" style="text-align:center;margin-bottom:8px">التداول الآلي ينطوي على مخاطر خسارة رأس المال. استخدم مبالغ تتحمل خسارتها.</div>
+
+<div id="md"><div class="bx"><div id="mt" style="margin-bottom:12px"></div><div class="r"><button id="my">تأكيد</button><button class="s" id="mn">إلغاء</button></div></div></div>
+
+<script>
+'use strict';
+const $=i=>document.getElementById(i);
+const BASES=['https://api.binance.com','https://api1.binance.com','https://api2.binance.com','https://api3.binance.com'];
+const POLL=60000;           // فحص كل 60 ثانية كما طلب العميل (قمم الشموع تُلتقط بين الفحوصات)
+const NATIVE=typeof AndroidBridge!=='undefined'; // داخل تطبيق أندرويد: خدمة أمامية تبقي البوت حياً
+const CONFIRM_START=true;   // false = تشغيل فوري بعد الاتصال بدون نافذة تأكيد
+const D={pos:null,pend:null,hist:[],logs:[],run:false,lastSell:0,crashAt:0,sym:'NEARUSDT',
+ cfg:{low:4,high:5.5,tr1:1,tr2:2,cool:0,sl:0}};
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+/* ---------- State ---------- */
+function load(){
+ try{const s=JSON.parse(localStorage.getItem('nb_state')||'{}');
+  return{...clone(D),...s,cfg:{...D.cfg,...(s.cfg||{})},logs:s.logs||[],hist:s.hist||[]}}
+ catch(e){return clone(D)}}
+let demo=false,S=load(),SYM=(S.pos&&S.pos.sym)||S.sym||'NEARUSDT';
+S.sym=SYM;
+const save=()=>{if(demo)return;try{localStorage.setItem('nb_state',JSON.stringify(S))}catch(e){}};
+
+let K=null,ex=null,info=null,busy=false,connecting=false,tm=null,pauseUntil=0,wl=null,uBal=null,lastTick=0,lastPx=0,off=0,bi=0;
+
+/* ---------- Helpers ---------- */
+const nf=(x,d)=>Number(x).toFixed(d);
+const fp=x=>{x=Number(x);return x>=100?nf(x,2):x>=1?nf(x,4):x>=.01?nf(x,5):nf(x,8)};
+const asset=()=>SYM.replace(/USDT$/,'');
+function ask(t){return new Promise(res=>{$('mt').textContent=t;$('md').classList.add('on');
+ const done=v=>{$('md').classList.remove('on');$('my').onclick=$('mn').onclick=null;res(v)};
+ $('my').onclick=()=>done(true);$('mn').onclick=()=>done(false)})}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function renderLog(){$('lg').replaceChildren(...S.logs.map(l=>{const d=document.createElement('div');d.textContent=l;return d}))}
+function log(t){S.logs.unshift(new Date().toLocaleTimeString('en-GB')+'  '+t);S.logs.length=Math.min(S.logs.length,60);renderLog();save()}
+const st=t=>{$('st').textContent=t};
+function msg(e){
+ const m={'-2015':'المفاتيح أو الصلاحيات أو قيود عنوان IP غير صحيحة','-1121':'رمز العملة غير صحيح','-1021':'فرق في توقيت الجهاز','-2010':'رفضت المنصة الأمر (رصيد غير كافٍ أو شرط غير مستوفى)'};
+ return (m[e.code]?m[e.code]+' — ':'')+(e.message||e)}
+
+/* ---------- Binance REST ---------- */
+const K256=[],H256=[];
+(function(){let n=2;for(let c=0;c<64;n++){let p=true;for(let i=2;i*i<=n;i++)if(n%i==0){p=false;break}
+ if(p){if(c<8)H256[c]=(Math.pow(n,.5)%1*4294967296)|0;K256[c]=(Math.pow(n,1/3)%1*4294967296)|0;c++}}})();
+function sha256(m){
+ const l=m.length,nb=((l+9+63)>>6)<<6,b=new Uint8Array(nb);b.set(m);b[l]=0x80;
+ const dv=new DataView(b.buffer),w=new Int32Array(64);
+ dv.setUint32(nb-4,(l*8)>>>0);dv.setUint32(nb-8,Math.floor(l*8/4294967296));
+ let h=H256.slice();
+ for(let o=0;o<nb;o+=64){
+  for(let i=0;i<16;i++)w[i]=dv.getInt32(o+i*4);
+  for(let i=16;i<64;i++){const a=w[i-15],c=w[i-2];
+   w[i]=(w[i-16]+((a>>>7|a<<25)^(a>>>18|a<<14)^(a>>>3))+w[i-7]+((c>>>17|c<<15)^(c>>>19|c<<13)^(c>>>10)))|0}
+  let[a,b2,c,d,e,f,g,hh]=h;
+  for(let i=0;i<64;i++){
+   const t1=(hh+((e>>>6|e<<26)^(e>>>11|e<<21)^(e>>>25|e<<7))+((e&f)^(~e&g))+K256[i]+w[i])|0,
+         t2=(((a>>>2|a<<30)^(a>>>13|a<<19)^(a>>>22|a<<10))+((a&b2)^(a&c)^(b2&c)))|0;
+   hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b2;b2=a;a=(t1+t2)|0}
+  h=[h[0]+a|0,h[1]+b2|0,h[2]+c|0,h[3]+d|0,h[4]+e|0,h[5]+f|0,h[6]+g|0,h[7]+hh|0]}
+ const out=new Uint8Array(32),ov=new DataView(out.buffer);h.forEach((x,i)=>ov.setInt32(i*4,x));return out}
+function hmacJS(sec,s){
+ const e=new TextEncoder();let k=e.encode(sec);if(k.length>64)k=sha256(k);
+ const ip=new Uint8Array(64),op=new Uint8Array(64);
+ for(let i=0;i<64;i++){ip[i]=(k[i]||0)^0x36;op[i]=(k[i]||0)^0x5c}
+ const m=e.encode(s),a=new Uint8Array(64+m.length);a.set(ip);a.set(m,64);
+ const inner=sha256(a),z=new Uint8Array(96);z.set(op);z.set(inner,64);
+ return[...sha256(z)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function hmac(sec,s){
+ if(!(window.crypto&&crypto.subtle))return hmacJS(sec,s);
+ const e=new TextEncoder(),k=await crypto.subtle.importKey('raw',e.encode(sec),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+ return[...new Uint8Array(await crypto.subtle.sign('HMAC',k,e.encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function sync(){const t=await req('/api/v3/time');off=t.serverTime-Date.now()}
+async function req(path,p={},signed=false,method='GET'){
+ const q=new URLSearchParams(p),h={};
+ if(signed){q.set('timestamp',Date.now()+off);q.set('recvWindow',10000);q.set('signature',await hmac(K.s,q.toString()));h['X-MBX-APIKEY']=K.k}
+ // الأوامر (POST) لا تُعاد على خادم آخر لتجنب تنفيذ مزدوج؛ طلبات القراءة فقط تجرّب خوادم بديلة
+ const tries=method==='GET'?BASES.length:1;let r=null;
+ for(let i=0;i<tries&&!r;i++){const b=(bi+i)%BASES.length;
+  try{r=await fetch(BASES[b]+path+'?'+q,{method,headers:h});bi=b}catch(e){}}
+ if(!r)throw new Error('تعذر الوصول إلى المنصة — تحقق من الإنترنت');
+ let j;try{j=await r.json()}catch(e){j={msg:'bad response'}}
+ if(!r.ok){const e=new Error(j.msg||('HTTP '+r.status));e.code=j.code;e.status=r.status;throw e}
+ return j}
+function fill(o){
+ let q=0,v=0,fa=0,fu=0;const A=asset();
+ for(const x of o.fills||[]){q+=+x.qty;v+=+x.price*+x.qty;
+  if(x.commissionAsset==A)fa+=+x.commission;
+  if(x.commissionAsset=='USDT')fu+=+x.commission}
+ return{qty:q-fa,usdt:+o.cummulativeQuoteQty-fu,px:q?v/q:0}}
+const real={
+ async init(){
+  await sync();
+  const s=(await req('/api/v3/exchangeInfo',{symbol:SYM})).symbols[0];
+  if(s.status!=='TRADING')throw new Error('الزوج '+SYM+' غير متاح للتداول حالياً');
+  const f=s.filters,l=f.find(x=>x.filterType=='LOT_SIZE'),m=f.find(x=>x.filterType=='NOTIONAL'||x.filterType=='MIN_NOTIONAL');
+  return{step:+l.stepSize,dec:(l.stepSize.replace(/0+$/,'').split('.')[1]||'').length,minN:+(m&&m.minNotional||5)}},
+ async price(){return +(await req('/api/v3/ticker/price',{symbol:SYM})).price},
+ async klines(n=20){return(await req('/api/v3/klines',{symbol:SYM,interval:'1m',limit:n})).map(c=>({t:+c[0],o:+c[1],h:+c[2],l:+c[3],c:+c[4]}))},
+ async bal(a){const r=await req('/api/v3/account',{},true);const b=r.balances.find(x=>x.asset==a);return b?+b.free:0},
+ async order(side,p){return fill(await req('/api/v3/order',{symbol:SYM,side,type:'MARKET',newOrderRespType:'FULL',...p},true,'POST'))},
+ async ord(id){return req('/api/v3/order',{symbol:SYM,origClientOrderId:id},true)}};
+let dp=3.2,dU=100,dN=0;
+const sim={
+ async init(){return{step:.01,dec:2,minN:5}},
+ async price(){dp=Math.max(.5,dp*(1+(Math.random()-.485)*.006));return dp},
+ async klines(n=20){const now=Date.now();
+  return Array.from({length:n},(_,i)=>{const last=i==n-1,c=last?dp:dp*(1+(Math.random()-.5)*.003);
+   return{t:now-(n-1-i)*60000,o:c,h:last?c:c*1.001,l:last?c:c*.999,c}})},
+ async bal(a){return a=='USDT'?dU:dN},
+ async order(s,p){const px=dp;
+  if(s=='BUY'){const u=+p.quoteOrderQty,q=u/px*.999;dN+=q;dU-=u;return{qty:q,usdt:u,px}}
+  const q=+p.quantity,u=q*px*.999;dN-=q;dU+=u;return{qty:q,usdt:u,px}},
+ async ord(){const e=new Error('none');e.code=-2013;throw e}};
+
+/* ---------- Strategy ---------- */
+async function crash(){
+ const k=await ex.klines(),hi=Math.max(...k.map(x=>x.h)),now=k[k.length-1].c;
+ const hit=(hi-now)/hi*100>=3||k.slice(-6).some(x=>(x.o-x.c)/x.o*100>=1.5);
+ if(hit&&!S.crashAt){S.crashAt=Date.now();log('⚠ هبوط حاد — إيقاف الدخول مؤقتاً')}
+ if(!S.crashAt)return false;
+ const r=k.slice(-4,-1),rng=Math.max(...r.map(x=>x.h))/Math.min(...r.map(x=>x.l))-1;
+ if(!hit&&rng<.006&&r[2].c>=r[1].c*.999){S.crashAt=0;log('✔ السوق استقر — استئناف الدخول');return false}
+ return true}
+async function buy(px){
+ const c=S.cfg;
+ if(px>=c.high)return st('فوق '+c.high+' — لا شراء جديد');
+ if(Date.now()-S.lastSell<c.cool*1000)return st('تهدئة بعد البيع');
+ if(await crash())return st('حماية الهبوط — انتظار');
+ const u=await ex.bal('USDT'),sp=Math.floor(u*100)/100;
+ if(sp<info.minN)return st('الرصيد أقل من الحد الأدنى للصفقة');
+ const id='nb'+Date.now();S.pend={id,side:'BUY'};save();
+ const o=await ex.order('BUY',{quoteOrderQty:sp.toFixed(2),newClientOrderId:id});
+ S.pos={sym:SYM,qty:o.qty,entry:o.px,cost:o.usdt,peak:Math.max(px,o.px),rocket:false,t:Date.now()};S.pend=null;save();
+ log('🟢 شراء '+nf(o.qty,4)+' '+asset()+' بسعر '+fp(o.px)+' ('+nf(o.usdt,2)+' USDT)')}
+async function sell(px,why){
+ const p=S.pos;let q=Math.min(p.qty,await ex.bal(asset()));q=Math.floor(q/info.step+1e-9)*info.step;
+ if(q*px<info.minN){log('كمية البيع أقل من الحد الأدنى — تم تصفير الصفقة');S.pos=null;save();return}
+ const id='nb'+Date.now();S.pend={id,side:'SELL'};save();
+ const o=await ex.order('SELL',{quantity:q.toFixed(info.dec),newClientOrderId:id});
+ closePos(p,o.px,o.usdt,why)}
+function closePos(p,x,usdt,why){
+ const pnl=usdt-p.cost;
+ S.hist.unshift({t:Date.now(),s:p.sym||SYM,e:p.entry,x,pnl,pct:pnl/p.cost*100,why});S.hist=S.hist.slice(0,200);
+ S.pos=null;S.pend=null;S.lastSell=Date.now();
+ log((pnl>=0?'🟢':'🔴')+' بيع بسعر '+fp(x)+' | '+why+' | '+nf(pnl,3)+' USDT ('+nf(pnl/p.cost*100,2)+'%)')}
+async function manage(px){
+ const p=S.pos,c=S.cfg;
+ // أعلى سعر حقيقي منذ الدخول من الشموع (حتى لا تفوت قمم بين الفحوصات)
+ const n=Math.min(1000,Math.max(5,Math.ceil((Date.now()-p.t)/60000)+2));
+ for(const k of await ex.klines(n))if(k.t>=p.t&&k.h>p.peak)p.peak=k.h;
+ if(px>p.peak)p.peak=px;
+ if(p.peak>c.high)p.rocket=true;
+ const t=p.rocket?c.tr2:c.tr1;
+ st(p.rocket?'🚀 متابعة الصاروخ (انعكاس '+t+'%)':'في صفقة (انعكاس '+t+'%)');
+ if(c.sl>0&&px<=p.entry*(1-c.sl/100))return sell(px,'وقف خسارة '+c.sl+'%');
+ if(px<=p.peak*(1-t/100))return sell(px,'انعكاس '+t+'% من القمة');
+ save()}
+async function tick(){
+ if(busy||!S.run||Date.now()<pauseUntil)return;busy=true;
+ try{
+  if(S.pend)await settlePend();   // أمر معلّق غير مؤكد: تأكد منه قبل أي أمر جديد (يمنع الشراء المزدوج)
+  const px=await ex.price(),c=S.cfg;lastTick=Date.now();lastPx=px;
+  $('px').textContent=fp(px);
+  $('zn').textContent=px<c.low?'منطقة القاع':px<c.high?'النطاق الطبيعي':'الموجة الصاروخية';
+  if(S.pos)await manage(px);else await buy(px);
+  uBal=await ex.bal('USDT');draw()}
+ catch(e){
+  log('خطأ: '+msg(e));
+  if(e.status==418){pauseUntil=Date.now()+300000;log('حظر من المنصة — انتظار 5 دقائق')}
+  else if(e.status==429){pauseUntil=Date.now()+60000;log('تجاوز حد الطلبات — انتظار 60 ثانية')}
+  else if(e.code==-1021){try{await sync()}catch(_){}}}
+ finally{busy=false}}
+
+/* ---------- Recovery / connect ---------- */
+async function settlePend(){
+ if(S.pend){
+  try{const o=await ex.ord(S.pend.id);
+   if(o.status=='FILLED'){const q=+o.executedQty,u=+o.cummulativeQuoteQty;
+    if(S.pend.side=='BUY'&&!S.pos){const b=await ex.bal(asset());
+     S.pos={sym:SYM,qty:Math.min(q,b),entry:u/q,cost:u,peak:u/q,rocket:false,t:o.time};log('↺ استعادة صفقة شراء لم تُسجَّل')}
+    else if(S.pend.side=='SELL'&&S.pos)closePos(S.pos,u/q,u,'استعادة بيع')}}
+  catch(e){if(e.code!=-2013)throw e}
+  S.pend=null;save()}}
+async function recover(){
+ await settlePend();
+ {
+ if(S.pos&&!demo){const b=await ex.bal(asset());
+  if(b*S.pos.entry<info.minN){log('الصفقة المحفوظة غير موجودة بالمحفظة — تم تصفيرها');S.pos=null;save()}}
+ if(S.pos)log('↺ استئناف صفقة محفوظة: دخول '+fp(S.pos.entry)+' | قمة '+fp(S.pos.peak))}}
+function bindUI(){
+ for(const k of Object.keys(D.cfg))$('c_'+k).value=S.cfg[k];
+ $('c_sym').value=SYM;setTitle();renderLog()}
+function setTitle(){$('symtitle').textContent=asset()+'/USDT';document.title=asset()+' Bot'}
+async function connect(isDemo){
+ if(connecting)return;connecting=true;
+ try{
+  if(isDemo){demo=true;S={...clone(D),cfg:{...S.cfg},sym:SYM};ex=sim;dp=3.2;dU=100;dN=0}
+  else{
+   const k=$('k').value.trim(),s=$('s').value.trim();
+   if(!k||!s){log('أدخل المفتاحين');return}
+   if(demo){demo=false;S=load();SYM=(S.pos&&S.pos.sym)||S.sym}
+   K={k,s};ex=real;
+   try{localStorage.setItem('nb_keys',JSON.stringify(K))}catch(e){}}
+  info=await ex.init();uBal=await ex.bal('USDT');
+  $('ub').textContent=nf(uBal,2);bindUI();
+  $('mode').textContent=demo?'(محاكاة)':'(حقيقي)';
+  log('✔ تم الاتصال'+(demo?' — وضع المحاكاة':''));
+  await recover();
+  for(const i of['go','no','sn','dc'])$(i).disabled=false;
+  $('kc').style.display='none';draw();
+  if(S.run)start(true);                       // استئناف تلقائي بعد إعادة التشغيل
+  else start(false)}           // الدخول فوراً بعد الاتصال
+ catch(e){log('فشل الاتصال: '+msg(e))}
+ finally{connecting=false}}
+async function disconnect(){
+ if(S.pos&&!demo&&!await ask('توجد صفقة مفتوحة وستصبح غير مُدارة بعد قطع الاتصال. متابعة؟'))return;
+ stop();
+ if(demo){demo=false;S=load();SYM=(S.pos&&S.pos.sym)||S.sym}
+ ex=null;K=null;info=null;
+ for(const i of['go','no','sn','dc'])$(i).disabled=true;
+ $('kc').style.display='';$('mode').textContent='';$('nx').textContent='';
+ bindUI();draw()}
+async function lock(){if(NATIVE)return;try{if('wakeLock' in navigator)wl=await navigator.wakeLock.request('screen')}catch(e){}}
+async function start(auto){
+ if(!auto&&!demo&&CONFIRM_START&&!await ask('رصيد USDT المتاح: '+nf(uBal||0,2)+'\nسيبدأ البوت التداول بأموال حقيقية باستخدام 100% من هذا الرصيد. هل تريد المتابعة؟'))return;
+ S.run=true;save();if(NATIVE&&!demo)try{AndroidBridge.setRunning(true)}catch(e){}lock();clearInterval(tm);tm=setInterval(tick,POLL);tick();
+ st('يعمل');log('▶ تشغيل — فحص كل '+POLL/1000+' ثانية — أبقِ الشاشة مفتوحة')}
+function stop(){
+ const was=S.run;S.run=false;save();clearInterval(tm);if(NATIVE)try{AndroidBridge.setRunning(false)}catch(e){}
+ try{wl&&wl.release()}catch(e){}
+ st('متوقف');$('nx').textContent='';
+ if(was)log('■ إيقاف'+(S.pos?' (الصفقة المفتوحة غير مُدارة حتى التشغيل)':''))}
+async function sellNow(){
+ if(!S.pos||!ex)return;
+ if(!await ask('بيع الصفقة المفتوحة الآن بسعر السوق وإيقاف البوت؟'))return;
+ stop();while(busy)await sleep(200);
+ busy=true;
+ try{const px=await ex.price();await sell(px,'بيع يدوي');uBal=await ex.bal('USDT');draw()}
+ catch(e){log('خطأ: '+msg(e))}
+ finally{busy=false}}
+
+/* ---------- UI ---------- */
+function draw(){
+ if(uBal!=null)$('ub').textContent=nf(uBal,2);
+ const p=S.pos,px=lastPx;
+ $('ps').innerHTML=p?'دخول '+fp(p.entry)+' | قمة '+fp(p.peak)+' | كمية '+nf(p.qty,4)+
+  (px?'<br>الربح/الخسارة الحالية: <b class="'+(px>=p.entry?'g':'b')+'">'+nf((px/p.entry-1)*100,2)+'%</b>':''):'لا توجد صفقة مفتوحة';
+ const h=S.hist,w=h.filter(x=>x.pnl>0).length,tot=h.reduce((a,x)=>a+x.pnl,0);
+ $('pf').innerHTML=h.length?'صفقات: '+h.length+' | رابحة: '+w+' ('+Math.round(w/h.length*100)+'%) | الإجمالي: <b class="'+(tot>=0?'g':'b')+'">'+nf(tot,3)+' USDT</b>':'لا صفقات بعد';
+ $('ht').innerHTML=h.length?'<tr><th>الوقت</th><th>العملة</th><th>دخول→خروج</th><th>%</th></tr>'+
+  h.slice(0,8).map(x=>'<tr><td>'+new Date(x.t).toLocaleString('en-GB',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+
+  '</td><td>'+String(x.s||'').replace(/USDT$/,'')+'</td><td>'+fp(x.e)+'→'+fp(x.x)+'</td><td class="'+(x.pnl>=0?'g':'b')+'">'+nf(x.pct,2)+'%</td></tr>').join(''):''}
+
+for(const k of Object.keys(D.cfg)){
+ const el=$('c_'+k);
+ el.onchange=()=>{
+  const v=parseFloat(el.value),c={...S.cfg,[k]:v};
+  const ok=v>=0&&isFinite(v)&&c.low<c.high&&c.low>0&&c.tr1>0&&c.tr1<50&&c.tr2>0&&c.tr2<50&&c.sl<100;
+  if(ok){S.cfg[k]=v;save()}else{el.value=S.cfg[k];log('⚠ قيمة غير صالحة — تم الرجوع للقيمة السابقة')}}}
+$('c_sym').onchange=async()=>{
+ let v=$('c_sym').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+ if(v&&!v.endsWith('USDT'))v+='USDT';
+ if(!v||v===SYM){$('c_sym').value=SYM;return}
+ if(S.pos){
+  if(!ex){log('⚠ توجد صفقة محفوظة — اضغط "اتصال" أولاً ثم غيّر العملة');$('c_sym').value=SYM;return}
+  if(!await ask('توجد صفقة مفتوحة على '+asset()+'. هل تريد بيعها الآن بسعر السوق ثم التبديل إلى '+v.replace(/USDT$/,'')+'؟')){log('أُلغي تغيير العملة');$('c_sym').value=SYM;return}
+  stop();while(busy)await sleep(200);
+  busy=true;
+  try{const px=await ex.price();await sell(px,'بيع قبل تغيير العملة');uBal=await ex.bal('USDT');draw()}
+  catch(e){log('خطأ أثناء البيع: '+msg(e));$('c_sym').value=SYM;return}
+  finally{busy=false}
+  if(S.pos){$('c_sym').value=SYM;return}
+ }
+ const old=SYM,wasRun=S.run;if(wasRun)stop();
+ SYM=v;
+ if(ex){
+  try{info=await ex.init();uBal=await ex.bal('USDT')}
+  catch(e){SYM=old;$('c_sym').value=old;try{info=await ex.init()}catch(_){}
+   log('تعذر التبديل إلى '+v+': '+msg(e));return}}
+ S.sym=v;S.crashAt=0;lastPx=0;save();setTitle();
+ $('c_sym').value=v;$('px').textContent='-';$('zn').textContent='-';
+ log('✔ تم التبديل إلى '+v+(wasRun?' — اضغط تشغيل للمتابعة':''));draw()};
+$('cn').onclick=()=>connect(false);$('dm').onclick=()=>connect(true);
+$('go').onclick=()=>start(false);$('no').onclick=stop;$('sn').onclick=sellNow;$('dc').onclick=disconnect;
+$('ck').onclick=()=>{try{localStorage.removeItem('nb_keys')}catch(e){}$('k').value='';$('s').value='';K=null;log('تم مسح المفاتيح المحفوظة')};
+
+/* ---------- Lifecycle ---------- */
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState!='visible'||!S.run)return;
+ lock();if(Date.now()-lastTick>POLL+5000)tick()});
+addEventListener('offline',()=>log('⚠ انقطع الإنترنت — سيستأنف البوت تلقائياً عند عودته'));
+addEventListener('online',()=>{log('✔ عاد الإنترنت');if(S.run)tick()});
+setInterval(()=>{
+ if(document.hidden||!S.run||!lastTick)return;
+ const n=Math.max(0,Math.round((lastTick+POLL-Date.now())/1000));
+ $('nx').textContent='آخر فحص: '+new Date(lastTick).toLocaleTimeString('en-GB')+' — التالي بعد '+Math.round(n/5)*5+' ث'},5000);
+
+bindUI();draw();
+try{localStorage.setItem('nb_t','1');localStorage.removeItem('nb_t')}
+catch(e){log('⚠ التخزين المحلي غير متاح — افتح الملف بمتصفح Chrome حتى تعمل الاستعادة بعد إعادة التشغيل')}
+try{const k=JSON.parse(localStorage.getItem('nb_keys')||'null');
+ if(k){$('k').value=k.k;$('s').value=k.s;if(S.run)connect(false)}}catch(e){}
+</script></body></html>
